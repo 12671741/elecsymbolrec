@@ -1,0 +1,143 @@
+import re
+import numpy as np
+import time
+import cv2
+import tflearn
+import os
+from scipy.signal import convolve2d
+import remax
+
+def SoftPlus(x, deriv=False):  #using the solftplus
+    if(deriv==True):
+        return (x*(1-x))
+    return 1/(1+np.exp(-x));
+
+def bipola_logi(x, deriv=False):  #using the solftplus
+    if(deriv==True):
+        return 0.5*(1-x*x)
+    return (1-np.exp(-x))/(1+np.exp(-x));
+
+def max_pool(x):
+    h,w = x.shape
+    x = x.reshape(h/2,2,w/2,2).swapaxes(1,2).reshape(h/2,w/2,4)
+    return np.amax(x,axis=2)
+
+batch_size = 1
+updateData=1
+randomweight=1
+
+dlen=10
+neul1=225 #1024
+neul2=32
+neul3=16
+
+learningrate=0.1
+if updateData:
+    print("creating data from database")
+    f=open('../data/d.txt','r')
+    f=f.read()
+    f=f.split('\n')
+    f=f[0:len(f)-1]
+    totallen=len(f)
+    total_batch = int(totallen/batch_size)
+    batch_ys=np.empty((total_batch,batch_size,dlen))
+    batch_xs=np.empty((total_batch,batch_size,32,32))
+    ys=0
+    for j in xrange(total_batch):
+        for i in xrange(batch_size):
+            fname='../data/face'+str(ys)+'.jpg'
+            img=cv2.imread(fname,0)
+            batch_xs[j][i]=img.astype(float)/128-1
+            batch_ys[j][i]=eval(f[i+j*batch_size].replace(" ",","))
+            ys=ys+1
+
+    batch_xs,batch_ys=tflearn.data_utils.shuffle(batch_xs,batch_ys)
+    np.savez_compressed("data/X",X=batch_xs)
+    np.save("data/Y",batch_ys)
+else:
+    print "loading saved data"
+    z=np.load("data/X.npz")
+    namelist = z.zip.namelist()
+    z.zip.extract(namelist[0])
+    batch_xs = np.load(namelist[0], mmap_mode='r+')
+    os.remove(namelist[0])
+    batch_ys=np.load("data/Y.npy")
+    total_batch=len(batch_xs)
+    totallen = total_batch*batch_size
+if randomweight:
+    print("randomise weights")
+    np.random.seed(2)
+    ker0  = 2*np.random.random((3,3))-1
+    syn0 = 2*np.random.random((neul1,neul2)) - 1
+    syn1 = 2*np.random.random((neul2,neul3)) - 1
+    syn2 = 2*np.random.random((neul3,10)) - 1
+else:
+    ker0 = np.load('weights/ker0.npy')
+    syn0 = np.load('weights/syn0.npy')
+    syn1 = np.load('weights/syn1.npy')
+    syn2 = np.load('weights/syn2.npy')
+np.set_printoptions(precision=3)
+testing_portion=0.9
+
+covx0_size=32-len(ker0)+1
+covx_l0=np.zeros((covx0_size/2,covx0_size/2),dtype=float)
+ker0_delta2=np.zeros((covx0_size,covx0_size),dtype=float)
+
+t=time.clock()
+for j in range(1000):
+    trainacu=0
+    testacu=0
+    print time.clock()-t
+    t=time.clock()
+    for i in range(total_batch):
+        covxl0 = convolve2d(batch_xs[i][0],ker0,'valid')#32 X 32
+        covx_l0=SoftPlus(max_pool(covxl0))
+        l0 = np.reshape(covx_l0,(1,-1))
+        l1 = bipola_logi(np.dot(l0, syn0))#shape (1, 32)
+        l2 = bipola_logi(np.dot(l1, syn1))#shape (1, 16)
+        l3 = bipola_logi(np.dot(l2, syn2))#shape (1, 10)
+        if i < int(total_batch*testing_portion):
+             # Back propagation of errors using the chain rule.
+            l3_error = batch_ys[i] - l3#shape (1, 10)
+            l3_delta = l3_error*bipola_logi(l3, deriv=True)#shape (1, 10)
+
+            l2_error = l3_delta.dot(syn2.T)#(1, 16)
+            l2_delta = l2_error*bipola_logi(l2, deriv=True)#(1, 16)
+
+            l1_error = l2_delta.dot(syn1.T)#(1, 32)
+            l1_delta = l1_error * bipola_logi(l1,deriv=True)#(1, 32)
+
+            #covlayer
+            ker0_delta = l1_delta.dot(syn0.T)*SoftPlus(l0,deriv=True)
+            ker0_delta = ker0_delta.reshape((covx0_size/2,covx0_size/2))
+            ker0_delta2[::2][:,::2]=ker0_delta
+
+            ker0 += convolve2d(batch_xs[i][0],ker0_delta2,'valid')*learningrate
+            syn2 += l2.T.dot(l3_delta)*learningrate
+            syn1 += l1.T.dot(l2_delta)*learningrate
+            syn0 += l0.T.dot(l1_delta)*learningrate
+            #print("Error: " + str(np.mean(np.abs(l2_error))))
+            trainacu+=np.sum(np.argmax(l3,axis=1)==np.argmax(batch_ys[i],axis=1))
+            #print ker
+            #print("ticks: ", trainacu," i: ",i)
+        else:
+            testacu+=np.sum(np.argmax(l3,axis=1)==np.argmax(batch_ys[i],axis=1))
+    print("accu: ", trainacu.astype(float)/(totallen*testing_portion),",iteration: ",j,"  velaccu = ", testacu.astype(float)/(totallen*(1-testing_portion)))
+    #print("Error: " + str(np.mean(np.abs(l3_error))),",iteration: ",j,"  velerror = ", acu.astype(float)/ys)
+    if j%5==4:
+        print ker0
+        np.save('weights/ker0', ker0)
+        np.save('weights/syn0', syn0)
+        np.save('weights/syn1', syn1)
+        np.save('weights/syn2', syn2)
+        print "weight saved"
+        #batch_xs,batch_ys=tflearn.data_utils.shuffle(batch_xs,batch_ys)
+print("Output trained syn")
+
+
+
+
+
+
+#im=X[0:18].sum(axis=0)
+#show_im(im)
