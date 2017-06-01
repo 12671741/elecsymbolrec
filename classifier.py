@@ -5,6 +5,7 @@ ker0 = np.load('weights/ker0.npy')
 W0 = np.load('weights/W0.npy')
 W1 = np.load('weights/W1.npy')
 W2 = np.load('weights/W2.npy')
+aug=np.array(-1).reshape(1,-1)
 
 def SoftPlus(x, deriv=False):  #using the solftplus
     if(deriv==True):
@@ -26,7 +27,8 @@ def classify(frame):
     covxl0=np.empty((4,14,14))
     for r in range(4):
         covxl0[r] = SoftPlus(max_pool(convolve2d(frame,ker0[r],'valid')))#32 X 32
-    l0 = np.reshape(covxl0,(1,-1))
+    #l0 = np.reshape(covxl0,(1,-1))
+    l0 = np.hstack((np.reshape(covxl0,(1,-1)),aug))
     l1 = bipola_logi(np.dot(l0, W0))
     l2 = bipola_logi(np.dot(l1, W1))
     l3 = bipola_logi(np.dot(l2, W2))

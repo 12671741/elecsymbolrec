@@ -24,14 +24,14 @@ def max_pool(x):
     return np.amax(x,axis=3)
 
 batch_size = 1
-updateData = 1
-randomweight=1
+updateData = 0
+randomweight=0
 
 dlen=10
 neul1=785 #1024
-neul2=64
-neul3=24
-learningrate=0.001
+neul2=128
+neul3=64
+learningrate=0.01
 
 
 if updateData:
@@ -118,7 +118,7 @@ for j in range(1000):
         if i < int(total_batch*training_portion):#back propagation
              # Back propagation of errors using the chain rule.
             l3_delta = l3_error*bipola_logi(l3, deriv=True)#shape (1, 10)
-
+            #l3_delta = l3_error/neul3#cross entropy loss method
             l2_error = l3_delta.dot(W2.T)#(1, 16)
             l2_delta = l2_error*bipola_logi(l2, deriv=True)#(1, 16)
 
