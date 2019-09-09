@@ -8,24 +8,29 @@ from scipy.signal import convolve2d
 import remax
 import matplotlib.pyplot as plt
 
-def SoftPlus(x, deriv=False):  #using the solftplus
+def Sigmoid(x, deriv=False):  #using the solftplus
     if(deriv==True):
-        return (x-np.square(x))
-    return 1/(1+np.exp(-x));
+        return (x-x**2)
+    return 1/(1+np.exp(-x))
 
-def bipola_logi(x, deriv=False):  #using the solftplus
+def bipola_logi(x, deriv=False):  #defining the bipola_logi
     if(deriv==True):
-        return 0.5*(1-np.square(x))
-    return (1-np.exp(-x))/(1+np.exp(-x));
+        return 0.5*(1-x**2)
+    return 2/(1+np.exp(-x))-1
 
-def max_pool(x):
-    n,h,w = x.shape
-    x = x.reshape(n,h/2,2,w/2,2).swapaxes(2,3).reshape(n,h/2,w/2,4)
-    return np.amax(x,axis=3)
+def SoftPlus(x, deriv=False):
+    if(deriv==True):
+        return 1/(1+np.exp(x))
+    return np.log(1+np.exp(x))
+
+def ReLU(x, deriv=False):
+    if(deriv==True):
+        return x>0
+    return np.maximum(x, 0, x)
 
 batch_size = 1
-updateData = 0
-randomweight=0
+updateData = 1
+randomweight=1
 
 dlen=10
 neul1=785 #1024

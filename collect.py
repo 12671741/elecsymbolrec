@@ -32,13 +32,13 @@ vs = WebcamVideoStream(src=0).start()
 myThread = camthread(qin,qout,1)
 myThread.start()
 
-f=open('../data/d.txt','r')
+f=open('../data26/d.txt','r')
 f=f.read()
 f=f.split('\n')
 f=f[0:len(f)-1]
 totallen=len(f)
 
-f=open('../data/d.txt','a')
+f=open('../data26/d.txt','a')
 d=np.zeros(26,np.uint8)
 k=totallen
 while True:
@@ -58,7 +58,7 @@ while True:
             break
         if 64<key<91:
             cframe=outf[hrange,:][:,wrange]
-            fname='../data/img'+str(k)+'.jpg'
+            fname='../data26/img'+str(k)+'.jpg'
             cv2.imwrite(fname,cframe)
             k=k+1
             d[key-65]=1
